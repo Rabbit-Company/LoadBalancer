@@ -1,6 +1,7 @@
 var origins = [
 	"https://dev.passky.org",
-	"https://dev2.passky.org"
+	"https://dev2.passky.org",
+	"https://dev3.passky.org"
 ];
 
 async function hash(message, encryption) {
@@ -40,10 +41,68 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 		await env.KV.put(hashedIP, userOrigin, { expirationTtl: 172800 });
 		let nres = new Response(userOrigin);
 		nres.headers.append('Cache-Control', 's-maxage=3600');
-		ctx.waitUntil(cache.put(cacheKey, new Response(userOrigin)));
+		ctx.waitUntil(cache.put(cacheKey, nres));
+	}
+
+	let isDown = await isServerDown(request, env, ctx, userOrigin);
+	if(isDown){
+
 	}
 
 	return userOrigin;
+}
+
+async function isServerDown(request, env, ctx, origin){
+	let isDown = false;
+	let time = null;
+
+	let cacheKey = new Request(request.url + "?server=" + origin, { headers: request.headers, method: 'GET' });
+	let cache = caches.default;
+	let res = await cache.match(cacheKey);
+	if(res) time = await res.text();
+
+	if(time == null){
+		time = await env.KV.get(origin, { cacheTtl: 60 });
+		let nres = new Response(origin);
+		nres.headers.append('Cache-Control', 's-maxage=60');
+		if(time != null) ctx.waitUntil(cache.put(cacheKey, nres));
+	}
+
+	if(time == null){
+		time = getRandomOrigin();
+		let nres = new Response(origin);
+		nres.headers.append('Cache-Control', 's-maxage=60');
+		ctx.waitUntil(cache.put(cacheKey, new Response(cacheKey, nres)));
+	}
+
+	if(time != null) isDown = true;
+
+	return isDown;
+}
+
+async function serverDown(server, env){
+	let date = new Date().toISOString().replace('T', ' ').split('.')[0];
+	let isLogged = await env.KV.get(server, { cacheTtl: 60 });
+	if(!isLogged) await env.KV.put(server, date, { expirationTtl: 600 });
+}
+
+async function serverUp(server, env){
+	let isLogged = await env.KV.get(server, { cacheTtl: 60 });
+	if(isLogged) await env.KV.delete(server);
+}
+
+async function checkServer(origin, env){
+	await fetch(origin).then((res) => {
+		if(!res.ok){
+			serverDown(origin, env);
+		}else if(res.status != 200){
+			serverDown(origin, env);
+		}else{
+			serverUp(origin, env);
+		}
+	}).catch(() => {
+    serverDown(origin, env);
+  });
 }
 
 export default {
@@ -59,5 +118,10 @@ export default {
 		}
 
 		return Response.redirect(userOrigin);
+	},
+	async scheduled(controller, env, ctx) {
+		origins.forEach(origin => {
+			ctx.waitUntil(checkServer(origin, env));
+		});
 	},
 };
