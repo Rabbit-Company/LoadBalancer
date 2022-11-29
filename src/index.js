@@ -54,6 +54,6 @@ export default {
 			return fetch(userOrigin + "/?" + params);
 		}
 
-		return new Response("\n Origin: " + request.url + "\n Hash: " + hashedIP + "\n Server: " + userOrigin);
+		return Response.redirect(userOrigin);
 	},
 };
