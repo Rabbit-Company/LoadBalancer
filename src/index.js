@@ -30,12 +30,16 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 
 	if(userOrigin == null){
 		userOrigin = await env.KV.get(hashedIP, { cacheTtl: 3600 });
-		if(userOrigin != null) ctx.waitUntil(cache.put(cacheKey, new Response(userOrigin)));
+		let nres = new Response(userOrigin);
+		nres.headers.append('Cache-Control', 's-maxage=3600');
+		if(userOrigin != null) ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
 	if(userOrigin == null){
 		userOrigin = getRandomOrigin();
 		await env.KV.put(hashedIP, userOrigin, { expirationTtl: 172800 });
+		let nres = new Response(userOrigin);
+		nres.headers.append('Cache-Control', 's-maxage=3600');
 		ctx.waitUntil(cache.put(cacheKey, new Response(userOrigin)));
 	}
 
