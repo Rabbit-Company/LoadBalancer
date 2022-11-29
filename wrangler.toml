@@ -1,0 +1,6 @@
+name = "loadbalancer"
+main = "src/index.js"
+compatibility_date = "2022-11-29"
+kv_namespaces = [
+  { binding = "KV", id = "7ff95bed4f6d407890ddafa99122bbfb" }
+]
