@@ -45,11 +45,23 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 	}
 
 	let isDown = await isServerDown(request, env, ctx, userOrigin);
-	if(isDown){
-
-	}
+	if(isDown) await fallbackServer(request, env, ctx, hashedIP);
 
 	return userOrigin;
+}
+
+async function fallbackServer(request, env, ctx, hashedIP){
+	let fbServer = getRandomOrigin();
+
+	let cacheKey = new Request(request.url + "?key=" + hashedIP, { headers: request.headers, method: 'GET' });
+	let cache = caches.default;
+	await cache.match(cacheKey);
+
+	let nres = new Response(fbServer);
+	nres.headers.append('Cache-Control', 's-maxage=3600');
+	ctx.waitUntil(cache.put(cacheKey, nres));
+
+	await env.KV.put(hashedIP, fbServer, { expirationTtl: 172800 });
 }
 
 async function isServerDown(request, env, ctx, origin){
@@ -68,27 +80,20 @@ async function isServerDown(request, env, ctx, origin){
 		if(time != null) ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
-	if(time == null){
-		time = getRandomOrigin();
-		let nres = new Response(origin);
-		nres.headers.append('Cache-Control', 's-maxage=60');
-		ctx.waitUntil(cache.put(cacheKey, new Response(cacheKey, nres)));
-	}
-
 	if(time != null) isDown = true;
 
 	return isDown;
 }
 
 async function serverDown(server, env){
-	let date = new Date().toISOString().replace('T', ' ').split('.')[0];
+	let date = new Date().toISOString().replace('T', ' ').split('.')[0];;
 	let isLogged = await env.KV.get(server, { cacheTtl: 60 });
-	if(!isLogged) await env.KV.put(server, date, { expirationTtl: 600 });
+	if(isLogged == null) await env.KV.put(server, date, { expirationTtl: 864000 });
 }
 
 async function serverUp(server, env){
 	let isLogged = await env.KV.get(server, { cacheTtl: 60 });
-	if(isLogged) await env.KV.delete(server);
+	if(isLogged != null) await env.KV.delete(server);
 }
 
 async function checkServer(origin, env){
