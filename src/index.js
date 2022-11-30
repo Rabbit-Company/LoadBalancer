@@ -32,7 +32,7 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 	if(userOrigin == null){
 		userOrigin = await env.KV.get(hashedIP, { cacheTtl: 3600 });
 		let nres = new Response(userOrigin);
-		nres.headers.append('Cache-Control', 's-maxage=3600');
+		nres.headers.append('Cache-Control', 's-maxage=60');
 		if(userOrigin != null) ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
@@ -40,25 +40,31 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 		userOrigin = getRandomOrigin();
 		await env.KV.put(hashedIP, userOrigin, { expirationTtl: 172800 });
 		let nres = new Response(userOrigin);
-		nres.headers.append('Cache-Control', 's-maxage=3600');
+		nres.headers.append('Cache-Control', 's-maxage=60');
 		ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
 	let isDown = await isServerDown(request, env, ctx, userOrigin);
-	if(isDown) await fallbackServer(request, env, ctx, hashedIP);
+	if(isDown){
+		for(let i = 0; i < 5; i++){
+			userOrigin = getRandomOrigin();
+			await fallbackServer(request, env, ctx, hashedIP, userOrigin);
+			isDown = await isServerDown(request, env, ctx, userOrigin);
+			if(!isDown) break;
+		}
+	}
 
 	return userOrigin;
 }
 
-async function fallbackServer(request, env, ctx, hashedIP){
-	let fbServer = getRandomOrigin();
+async function fallbackServer(request, env, ctx, hashedIP, fbServer){
 
 	let cacheKey = new Request(request.url + "?key=" + hashedIP, { headers: request.headers, method: 'GET' });
 	let cache = caches.default;
 	await cache.match(cacheKey);
 
 	let nres = new Response(fbServer);
-	nres.headers.append('Cache-Control', 's-maxage=3600');
+	nres.headers.append('Cache-Control', 's-maxage=60');
 	ctx.waitUntil(cache.put(cacheKey, nres));
 
 	await env.KV.put(hashedIP, fbServer, { expirationTtl: 172800 });
