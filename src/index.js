@@ -119,7 +119,14 @@ export default {
 
 		if(request.url.includes('?')){
 			let params = request.url.split('?')[1];
-			return fetch(userOrigin + "/?" + params);
+
+			request = new Request(userOrigin + "/?" + params, request);
+			request.headers.set('Origin', new URL(userOrigin + "/?" + params).origin);
+
+			let response = await fetch(request);
+			response = new Response(response.body, response);
+
+			return response;
 		}
 
 		return Response.redirect(userOrigin);
