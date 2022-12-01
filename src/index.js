@@ -145,7 +145,7 @@ export default {
 
 		return Response.redirect(userOrigin);
 	},
-	async scheduled(controller, env, ctx) {
+	async scheduled(event, env, ctx) {
 		env.ORIGINS.forEach(origin => {
 			ctx.waitUntil(checkServer(origin, env, ctx));
 		});
