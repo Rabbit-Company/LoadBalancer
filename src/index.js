@@ -4,6 +4,8 @@ var origins = [
 	"https://dev3.passky.org"
 ];
 
+var endpoint = "/?action=getInfo";
+
 async function hash(message, encryption) {
 	const msgUint8 = new TextEncoder().encode(message);
 	const hashBuffer = await crypto.subtle.digest(encryption, msgUint8);
@@ -32,7 +34,7 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 	if(userOrigin == null){
 		userOrigin = await env.KV.get(hashedIP, { cacheTtl: 3600 });
 		let nres = new Response(userOrigin);
-		nres.headers.append('Cache-Control', 's-maxage=60');
+		nres.headers.append('Cache-Control', 's-maxage=30');
 		if(userOrigin != null) ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
@@ -40,7 +42,7 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 		userOrigin = getRandomOrigin();
 		await env.KV.put(hashedIP, userOrigin, { expirationTtl: 172800 });
 		let nres = new Response(userOrigin);
-		nres.headers.append('Cache-Control', 's-maxage=60');
+		nres.headers.append('Cache-Control', 's-maxage=30');
 		ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
@@ -64,7 +66,7 @@ async function fallbackServer(request, env, ctx, hashedIP, fbServer){
 	await cache.match(cacheKey);
 
 	let nres = new Response(fbServer);
-	nres.headers.append('Cache-Control', 's-maxage=60');
+	nres.headers.append('Cache-Control', 's-maxage=30');
 	ctx.waitUntil(cache.put(cacheKey, nres));
 
 	await env.KV.put(hashedIP, fbServer, { expirationTtl: 172800 });
@@ -82,7 +84,7 @@ async function isServerDown(request, env, ctx, origin){
 	if(time == null){
 		time = await env.KV.get(origin, { cacheTtl: 60 });
 		let nres = new Response(origin);
-		nres.headers.append('Cache-Control', 's-maxage=60');
+		nres.headers.append('Cache-Control', 's-maxage=30');
 		if(time != null) ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
@@ -102,17 +104,17 @@ async function serverUp(server, env){
 	if(isLogged != null) await env.KV.delete(server);
 }
 
-async function checkServer(origin, env){
-	await fetch(origin).then((res) => {
+async function checkServer(origin, env, ctx){
+	await fetch(origin + endpoint).then((res) => {
 		if(!res.ok){
-			serverDown(origin, env);
+			ctx.waitUntil(serverDown(origin, env));
 		}else if(res.status != 200){
-			serverDown(origin, env);
+			ctx.waitUntil(serverDown(origin, env));
 		}else{
-			serverUp(origin, env);
+			ctx.waitUntil(serverUp(origin, env));
 		}
 	}).catch(() => {
-		serverDown(origin, env);
+		ctx.waitUntil(serverDown(origin, env));
 	});
 }
 
@@ -139,7 +141,7 @@ export default {
 	},
 	async scheduled(controller, env, ctx) {
 		origins.forEach(origin => {
-			ctx.waitUntil(checkServer(origin, env));
+			ctx.waitUntil(checkServer(origin, env, ctx));
 		});
 	},
 };
