@@ -13,8 +13,8 @@ function getRandomInt(max, min = 0) {
 	return Math.floor(Math.random() * (max - min)) + min;
 }
 
-function getRandomOrigin(){
-	return ORIGINS[getRandomInt(ORIGINS.length)];
+function getRandomOrigin(env){
+	return env.ORIGINS[getRandomInt(env.ORIGINS.length)];
 }
 
 async function getUserOrigin(request, env, ctx, hashedIP){
@@ -32,7 +32,7 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 	}
 
 	if(userOrigin == null){
-		userOrigin = getRandomOrigin();
+		userOrigin = getRandomOrigin(env);
 		await env.KV.put(hashedIP, userOrigin, { expirationTtl: 172800 });
 		let nres = new Response(userOrigin);
 		nres.headers.append('Cache-Control', 's-maxage=60');
@@ -42,7 +42,7 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 	let isDown = await isServerDown(request, env, ctx, userOrigin);
 	if(isDown){
 		for(let i = 0; i < 5; i++){
-			userOrigin = getRandomOrigin();
+			userOrigin = getRandomOrigin(env);
 			await fallbackServer(request, env, ctx, hashedIP, userOrigin);
 			isDown = await isServerDown(request, env, ctx, userOrigin);
 			if(!isDown) break;
@@ -94,7 +94,7 @@ async function serverUp(server, env){
 }
 
 async function checkServer(origin, env, ctx){
-	await fetch(origin + ENDPOINT).then((res) => {
+	await fetch(origin + env.ENDPOINT).then((res) => {
 		if(!res.ok){
 			ctx.waitUntil(serverDown(origin, env));
 		}else if(res.status != 200){
@@ -129,7 +129,7 @@ export default {
 		return Response.redirect(userOrigin);
 	},
 	async scheduled(controller, env, ctx) {
-		ORIGINS.forEach(origin => {
+		env.ORIGINS.forEach(origin => {
 			ctx.waitUntil(checkServer(origin, env, ctx));
 		});
 	},
