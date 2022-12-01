@@ -4,13 +4,29 @@ main = "src/index.js"
 compatibility_date = "2022-11-29"
 
 [vars]
+
 # Specify all origins that you want to monitor.
 ORIGINS = [
 	"https://dev.passky.org",
 	"https://dev2.passky.org"
 ]
+
+# Used if you choose Weighted round robin algorithm
+WEIGHTS = [
+	50,
+	50
+]
+
 # To monitor specific endpoint.
 ENDPOINT = "/?action=getInfo"
+
+# Choose Load Balancing algorithm
+# 	Static:
+#			- 0 (Round robin)
+#			- 1 (Weighted round robin)
+#		Dynamic:
+#			- 10 (Resource-based) -> Specialized software required
+BALANCING_ALGO = 0
 
 [[kv_namespaces]]
 binding = "KV"

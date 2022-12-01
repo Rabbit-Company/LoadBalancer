@@ -13,7 +13,24 @@ function getRandomInt(max, min = 0) {
 	return Math.floor(Math.random() * (max - min)) + min;
 }
 
+function getWeightedRR(env){
+	let sum = 0;
+	env.WEIGHTS.forEach(w => {
+		sum += w;
+	});
+
+	let rnd = getRandomInt(sum - 1);
+	for(let i = 0; i < env.WEIGHTS.length; i++){
+		if(rnd < env.WEIGHTS[i]) return env.ORIGINS[i];
+		rnd -= env.WEIGHTS[i];
+	}
+
+	return env.ORIGINS[0];
+}
+
 function getRandomOrigin(env){
+	let algo = env.BALANCING_ALGO;
+	if(algo == 1) return getWeightedRR(env);
 	return env.ORIGINS[getRandomInt(env.ORIGINS.length)];
 }
 
