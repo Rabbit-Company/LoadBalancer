@@ -1,10 +1,3 @@
-var origins = [
-	"https://dev.passky.org",
-	"https://dev2.passky.org"
-];
-
-var endpoint = "/?action=getInfo";
-
 const cache = caches.default;
 
 async function hash(message, encryption) {
@@ -21,7 +14,7 @@ function getRandomInt(max, min = 0) {
 }
 
 function getRandomOrigin(){
-	return origins[getRandomInt(origins.length)];
+	return ORIGINS[getRandomInt(ORIGINS.length)];
 }
 
 async function getUserOrigin(request, env, ctx, hashedIP){
@@ -90,7 +83,7 @@ async function isServerDown(request, env, ctx, origin){
 }
 
 async function serverDown(server, env){
-	let date = new Date().toISOString().replace('T', ' ').split('.')[0];;
+	let date = new Date().toISOString().replace('T', ' ').split('.')[0];
 	let isLogged = await env.KV.get(server, { cacheTtl: 60 });
 	if(isLogged == null) await env.KV.put(server, date, { expirationTtl: 864000 });
 }
@@ -101,7 +94,7 @@ async function serverUp(server, env){
 }
 
 async function checkServer(origin, env, ctx){
-	await fetch(origin + endpoint).then((res) => {
+	await fetch(origin + ENDPOINT).then((res) => {
 		if(!res.ok){
 			ctx.waitUntil(serverDown(origin, env));
 		}else if(res.status != 200){
@@ -136,7 +129,7 @@ export default {
 		return Response.redirect(userOrigin);
 	},
 	async scheduled(controller, env, ctx) {
-		origins.forEach(origin => {
+		ORIGINS.forEach(origin => {
 			ctx.waitUntil(checkServer(origin, env, ctx));
 		});
 	},
