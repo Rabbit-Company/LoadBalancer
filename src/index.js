@@ -5,6 +5,8 @@ var origins = [
 
 var endpoint = "/?action=getInfo";
 
+const cache = caches.default;
+
 async function hash(message, encryption) {
 	const msgUint8 = new TextEncoder().encode(message);
 	const hashBuffer = await crypto.subtle.digest(encryption, msgUint8);
@@ -25,8 +27,7 @@ function getRandomOrigin(){
 async function getUserOrigin(request, env, ctx, hashedIP){
 	let userOrigin = null;
 
-	let cacheKey = new Request(request.url + "?key=" + hashedIP, { headers: request.headers, method: 'GET' });
-	let cache = caches.default;
+	let cacheKey = request.url + "?key=" + hashedIP;
 	let res = await cache.match(cacheKey);
 	if(res) userOrigin = await res.text();
 
@@ -60,13 +61,10 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 
 async function fallbackServer(request, env, ctx, hashedIP, fbServer){
 
-	let cacheKey = new Request(request.url + "?key=" + hashedIP, { headers: request.headers, method: 'GET' });
-	let cache = caches.default;
-	await cache.match(cacheKey);
-
-	let nres = new Response(fbServer);
-	nres.headers.append('Cache-Control', 's-maxage=60');
-	ctx.waitUntil(cache.put(cacheKey, nres));
+	let cacheKey = request.url + "?key=" + hashedIP;
+	const res = new Response(fbServer);
+	res.headers.append('Cache-Control', 's-maxage=60');
+	ctx.waitUntil(cache.put(cacheKey, res));
 
 	await env.KV.put(hashedIP, fbServer, { expirationTtl: 172800 });
 }
@@ -75,8 +73,7 @@ async function isServerDown(request, env, ctx, origin){
 	let isDown = false;
 	let time = null;
 
-	let cacheKey = new Request(request.url + "?server=" + origin, { headers: request.headers, method: 'GET' });
-	let cache = caches.default;
+	let cacheKey = request.url + "?server=" + origin;
 	let res = await cache.match(cacheKey);
 	if(res) time = await res.text();
 
