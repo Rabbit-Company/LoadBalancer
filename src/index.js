@@ -1,7 +1,6 @@
 var origins = [
 	"https://dev.passky.org",
-	"https://dev2.passky.org",
-	"https://dev3.passky.org"
+	"https://dev2.passky.org"
 ];
 
 var endpoint = "/?action=getInfo";
