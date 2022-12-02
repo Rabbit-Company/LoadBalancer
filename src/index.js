@@ -112,9 +112,7 @@ async function serverUp(server, env){
 
 async function checkServer(origin, env, ctx){
 	await fetch(origin + env.ENDPOINT).then((res) => {
-		if(!res.ok){
-			ctx.waitUntil(serverDown(origin, env));
-		}else if(res.status != 200){
+		if(!res.ok || res.status != 200){
 			ctx.waitUntil(serverDown(origin, env));
 		}else{
 			ctx.waitUntil(serverUp(origin, env));
