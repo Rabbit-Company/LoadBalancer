@@ -69,6 +69,19 @@ async function fallbackServer(request, env, ctx, hashedIP, fbServer){
 	await env.KV.put(hashedIP, fbServer, { expirationTtl: 172800 });
 }
 
+async function changeOrigin(request, env, ctx, hashedIP, userOrigin, params){
+	for(let i = 0; i < 5; i++){
+		userOrigin = getRandomOrigin(env);
+		let req = new Request(userOrigin + "/?" + params, request);
+		req.headers.set('Origin', new URL(userOrigin + "/?" + params).origin);
+		const responseFB = await fetch(req);
+		if(!responseFB.ok || (responseFB.status != 200 && responseFB.status != 429)) continue;
+		await fallbackServer(request, env, ctx, hashedIP, userOrigin);
+		return responseFB;
+	}
+	return Response.redirect(userOrigin);
+}
+
 export default {
 	async fetch(request, env, ctx) {
 		let date = new Date().toISOString().split('T')[0];
@@ -84,16 +97,7 @@ export default {
 
 			const response = await fetch(req);
 			if(!response.ok || (response.status != 200 && response.status != 429)){
-				for(let i = 0; i < 5; i++){
-					userOrigin = getRandomOrigin(env);
-					req = new Request(userOrigin + "/?" + params, request);
-					req.headers.set('Origin', new URL(userOrigin + "/?" + params).origin);
-					const responseFB = await fetch(req);
-					if(!responseFB.ok || (responseFB.status != 200 && responseFB.status != 429)) continue;
-					await fallbackServer(request, env, ctx, hashedIP, userOrigin);
-					return responseFB;
-				}
-				return Response.redirect(userOrigin);
+				return await changeOrigin(request, env, ctx, hashedIP, userOrigin, params);
 			}
 			return response;
 		}else{
