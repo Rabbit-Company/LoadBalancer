@@ -56,16 +56,6 @@ async function getUserOrigin(request, env, ctx, hashedIP){
 		ctx.waitUntil(cache.put(cacheKey, nres));
 	}
 
-	let isDown = await isServerDown(request, env, ctx, userOrigin);
-	if(isDown){
-		for(let i = 0; i < 5; i++){
-			userOrigin = getRandomOrigin(env);
-			await fallbackServer(request, env, ctx, hashedIP, userOrigin);
-			isDown = await isServerDown(request, env, ctx, userOrigin);
-			if(!isDown) break;
-		}
-	}
-
 	return userOrigin;
 }
 
@@ -79,49 +69,6 @@ async function fallbackServer(request, env, ctx, hashedIP, fbServer){
 	await env.KV.put(hashedIP, fbServer, { expirationTtl: 172800 });
 }
 
-async function isServerDown(request, env, ctx, origin){
-	let isDown = false;
-	let time = null;
-
-	let cacheKey = request.url + "?server=" + origin;
-	let res = await cache.match(cacheKey);
-	if(res) time = await res.text();
-
-	if(time == null){
-		time = await env.KV.get(origin, { cacheTtl: 60 });
-		let nres = new Response(origin);
-		nres.headers.append('Cache-Control', 's-maxage=60');
-		if(time != null) ctx.waitUntil(cache.put(cacheKey, nres));
-	}
-
-	if(time != null) isDown = true;
-
-	return isDown;
-}
-
-async function serverDown(server, env){
-	let date = new Date().toISOString().replace('T', ' ').split('.')[0];
-	let isLogged = await env.KV.get(server, { cacheTtl: 60 });
-	if(isLogged == null) await env.KV.put(server, date, { expirationTtl: 864000 });
-}
-
-async function serverUp(server, env){
-	let isLogged = await env.KV.get(server, { cacheTtl: 60 });
-	if(isLogged != null) await env.KV.delete(server);
-}
-
-async function checkServer(origin, env, ctx){
-	await fetch(origin + env.ENDPOINT).then((res) => {
-		if(!res.ok || res.status != 200){
-			ctx.waitUntil(serverDown(origin, env));
-		}else{
-			ctx.waitUntil(serverUp(origin, env));
-		}
-	}).catch(() => {
-		ctx.waitUntil(serverDown(origin, env));
-	});
-}
-
 export default {
 	async fetch(request, env, ctx) {
 		let date = new Date().toISOString().split('T')[0];
@@ -132,20 +79,25 @@ export default {
 		if(request.url.includes('?')){
 			let params = request.url.split('?')[1];
 
-			request = new Request(userOrigin + "/?" + params, request);
-			request.headers.set('Origin', new URL(userOrigin + "/?" + params).origin);
+			let req = new Request(userOrigin + "/?" + params, request);
+			req.headers.set('Origin', new URL(userOrigin + "/?" + params).origin);
 
-			let response = await fetch(request);
-			response = new Response(response.body, response);
-
+			const response = await fetch(req);
+			if(!response.ok || (response.status != 200 && response.status != 429)){
+				for(let i = 0; i < 5; i++){
+					userOrigin = getRandomOrigin(env);
+					req = new Request(userOrigin + "/?" + params, request);
+					req.headers.set('Origin', new URL(userOrigin + "/?" + params).origin);
+					const responseFB = await fetch(req);
+					if(!responseFB.ok || (responseFB.status != 200 && responseFB.status != 429)) continue;
+					await fallbackServer(request, env, ctx, hashedIP, userOrigin);
+					return responseFB;
+				}
+				return Response.redirect(userOrigin);
+			}
 			return response;
+		}else{
+			return Response.redirect(userOrigin);
 		}
-
-		return Response.redirect(userOrigin);
-	},
-	async scheduled(event, env, ctx) {
-		env.ORIGINS.forEach(origin => {
-			ctx.waitUntil(checkServer(origin, env, ctx));
-		});
-	},
+	}
 };

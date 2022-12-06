@@ -1,4 +1,4 @@
-name = "loadbalancer"
+name = "passky-loadbalancer-eu"
 main = "src/index.js"
 
 compatibility_date = "2022-11-29"
@@ -24,13 +24,8 @@ ENDPOINT = "/?action=getInfo"
 # 	Static:
 #			- 0 (Round robin)
 #			- 1 (Weighted round robin)
-#		Dynamic:
-#			- 10 (Resource-based) -> Specialized software required
 BALANCING_ALGO = 0
 
 [[kv_namespaces]]
 binding = "KV"
 id = "7ff95bed4f6d407890ddafa99122bbfb"
-
-[triggers]
-crons = ["* * * * *"]
