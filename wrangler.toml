@@ -1,7 +1,7 @@
 name = "passky-loadbalancer-eu"
 main = "src/index.js"
 
-compatibility_date = "2022-11-29"
+compatibility_date = "2022-12-06"
 
 [vars]
 
