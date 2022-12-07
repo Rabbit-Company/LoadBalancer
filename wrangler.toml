@@ -7,8 +7,8 @@ compatibility_date = "2022-12-06"
 
 # Specify all origins that you want to monitor.
 ORIGINS = [
-	"https://dev.passky.org",
-	"https://dev2.passky.org"
+	"https://eu3.passky.org",
+	"https://eu4.passky.org"
 ]
 
 # Used if you choose Weighted round robin algorithm
@@ -28,4 +28,4 @@ BALANCING_ALGO = 0
 
 [[kv_namespaces]]
 binding = "KV"
-id = "7ff95bed4f6d407890ddafa99122bbfb"
+id = "1c92215efde74e198906be9e3d2a3162"
